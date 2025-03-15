@@ -41,7 +41,7 @@ class AuthApp(QMainWindow, Ui_Authorization):
         login = self.logEdit.text()
         password = self.pasEdit.text()
         if not login or not password:
-            QMessageBox.warning(self, "Ошибка", "Логин и пароль не могут быть пустыми")
+            QMessageBox.warning(self, "Ошибка", "Логин и пароль не могут быть пустыми!")
             return
 
         hashed_password = self.hash_password(password)
@@ -58,7 +58,7 @@ class AuthApp(QMainWindow, Ui_Authorization):
             self.user_id = query.value("id_accounts")
             self.user_dolj = query.value("dolj")
 
-            QMessageBox.information(self, "Успех", f"Авторизация прошла успешно!\nДолжность: {self.user_dolj}")
+            QMessageBox.information(self, "Успех", f"Авторизация прошла успешно!")
             self.hide()
 
             if not self.is_admin and not self.is_supervisor:

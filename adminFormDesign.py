@@ -31,13 +31,11 @@ class Ui_adminForm(object):
         font.setPointSize(14)
         self.updatePolzBtn.setFont(font)
         self.updatePolzBtn.setObjectName("updatePolzBtn")
-        self.backBtn = QtWidgets.QPushButton(parent=self.centralwidget)
-        self.backBtn.setGeometry(QtCore.QRect(720, 600, 150, 40))
+
         font = QtGui.QFont()
         font.setFamily("Noto Kufi Arabic")
         font.setPointSize(14)
-        self.backBtn.setFont(font)
-        self.backBtn.setObjectName("backBtn")
+
         self.selectPolz = QtWidgets.QComboBox(parent=self.centralwidget)
         self.selectPolz.setGeometry(QtCore.QRect(20, 390, 381, 25))
         font = QtGui.QFont()
@@ -160,7 +158,6 @@ class Ui_adminForm(object):
         adminForm.setWindowTitle(_translate("adminForm", "Администрирование"))
         self.addPolzBtn.setText(_translate("adminForm", "Добавить"))
         self.updatePolzBtn.setText(_translate("adminForm", "Изменить"))
-        self.backBtn.setText(_translate("adminForm", "Назад"))
         self.label.setText(_translate("adminForm", "Выберите пользователя"))
         self.label_2.setText(_translate("adminForm", "Фамилия"))
         self.label_4.setText(_translate("adminForm", "Отчество"))
