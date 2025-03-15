@@ -4,6 +4,8 @@ from auth import Ui_Authorization
 from user_form import UchetForm
 from otcheti import OtchetForm
 import sys
+import hashlib
+
 
 class AuthApp(QMainWindow, Ui_Authorization):
     def __init__(self):
@@ -13,15 +15,14 @@ class AuthApp(QMainWindow, Ui_Authorization):
         self.is_supervisor = False
         self.is_superadmin = False
         self.user_id = None
-
+        self.user_dolj = None  # Добавляем поле для хранения должности пользователя
 
         # Подключение к базе данных
         self.db = QSqlDatabase.addDatabase("QODBC")
-        self.db.setDatabaseName("DRIVER={SQL Server};SERVER=DESKTOP-3LKN5MJ\\SQLEXPRESS;DATABASE=mdu;")
+        self.db.setDatabaseName("DRIVER={SQL Server};SERVER=.\\SQLEXPRESS;DATABASE=mdu;")
         if not self.db.open():
             QMessageBox.critical(self, "Ошибка", "Не удалось подключиться к базе данных")
             sys.exit(1)
-
 
         self.logBtn.clicked.connect(self.on_login)
         self.exitBtn.clicked.connect(self.close)
@@ -34,6 +35,10 @@ class AuthApp(QMainWindow, Ui_Authorization):
         else:
             self.pasEdit.setEchoMode(QLineEdit.EchoMode.Password)
 
+    def hash_password(self, password):
+        # Хэшируем пароль с использованием SHA-256
+        return hashlib.sha256(password.encode()).hexdigest()
+
     def on_login(self):
         login = self.logEdit.text()
         password = self.pasEdit.text()
@@ -41,18 +46,24 @@ class AuthApp(QMainWindow, Ui_Authorization):
             QMessageBox.warning(self, "Ошибка", "Логин и пароль не могут быть пустыми")
             return
 
+        # Хэшируем пароль
+        hashed_password = self.hash_password(password)
+
         query = QSqlQuery()
-        query.prepare("SELECT * FROM dbo.accounts WHERE user_login = :user_login AND user_password = :user_password")
+        query.prepare("EXEC dbo.CheckLogPass @user_login = :user_login, @user_password = :user_password")
         query.bindValue(":user_login", login)
-        query.bindValue(":user_password", password)
+        query.bindValue(":user_password", hashed_password)
 
         if query.exec() and query.next():
             self.is_admin = query.value("administrator")
             self.is_supervisor = query.value("supervisor")
             self.is_superadmin = query.value("superadmin")
             self.user_id = query.value("id_accounts")
-            QMessageBox.information(self, "Успех", "Авторизация прошла успешно!")
+            self.user_dolj = query.value("dolj")  # Получаем должность пользователя
+
+            QMessageBox.information(self, "Успех", f"Авторизация прошла успешно!\nДолжность: {self.user_dolj}")
             self.hide()
+
             if not self.is_admin and not self.is_supervisor:
                 self.open_uchet_form()
             else:
@@ -71,6 +82,7 @@ class AuthApp(QMainWindow, Ui_Authorization):
     def closeEvent(self, event):
         self.db.close()
         event.accept()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

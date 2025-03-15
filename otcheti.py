@@ -52,9 +52,14 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
         else:
             self.poReportFrame.setVisible(False)
 
-    def usersListUReport(self):  # Заполняет ComboBox данными о сотрудниках из базы данных.
+    def usersListUReport(self):
+        # Заполняет ComboBox данными о сотрудниках из базы данных
         query = QSqlQuery()
-        query.exec("SELECT id_accounts, F_sotr, I_sotr, O_sotr FROM dbo.accounts")
+        query.exec("""
+            SELECT a.id_accounts, s.F_sotr, s.I_sotr, s.O_sotr
+            FROM dbo.accounts a
+            JOIN dbo.sotr s ON a.sotr_id = s.id_sotr
+        """)
         self.selectUser.clear()
         self.selectUser.addItem("- Выберите пользователя -", None)
         while query.next():
@@ -62,9 +67,14 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
             user_name = f"{query.value(1)} {query.value(2)} {query.value(3)}"
             self.selectUser.addItem(user_name, user_id)
 
-    def usersListPoReport(self): # Заполняет ComboBox данными о сотрудниках из базы данных.
+    def usersListPoReport(self):
+        # Заполняет ComboBox данными о сотрудниках из базы данных
         query = QSqlQuery()
-        query.exec("SELECT id_accounts, F_sotr, I_sotr, O_sotr FROM dbo.accounts")
+        query.exec("""
+            SELECT a.id_accounts, s.F_sotr, s.I_sotr, s.O_sotr
+            FROM dbo.accounts a
+            JOIN dbo.sotr s ON a.sotr_id = s.id_sotr
+        """)
         self.selectPoUser.clear()
         self.selectPoUser.addItem("- Выберите пользователя -", None)
         while query.next():
@@ -72,7 +82,8 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
             user_name = f"{query.value(1)} {query.value(2)} {query.value(3)}"
             self.selectPoUser.addItem(user_name, user_id)
 
-    def user_generate_report(self): # Формирует отчет о рабочем времени сотрудника за выбранный период.
+    def user_generate_report(self):
+        # Формирует отчет о рабочем времени сотрудника за выбранный период
         user_id = self.selectUser.currentData()
         start_date = self.fistDate.date().toString("dd-MM-yyyy")
         end_date = self.lastDate.date().toString("dd-MM-yyyy")
@@ -101,26 +112,27 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
             model.setHeaderData(3, Qt.Orientation.Horizontal, "Длительность")
 
             self.otchetTable.setModel(model)
-
             self.otchetTable.resizeColumnsToContents()
             self.otchetTable.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         else:
             QMessageBox.warning(self, "Ошибка", "Не удалось сформировать отчет")
 
-    def day_generate_report(self):  # Формирует отчет о рабочем времени всех сотрудников за выбранный день.
+    def day_generate_report(self):
+        # Формирует отчет о рабочем времени всех сотрудников за выбранный день
         selected_date = self.reportDate.date().toString("dd-MM-yyyy")
 
         query = QSqlQuery()
         query.prepare("""
-               SELECT 
-                   CONCAT(a.F_sotr, ' ', a.I_sotr, ' ', a.O_sotr) AS ФИО, 
-                   t.nachal_rab_den, 
-                   t.okonch_rab_den, 
-                   t.dlit
-               FROM dbo.TYRV t
-               JOIN dbo.accounts a ON t.accounts2_id = a.id_accounts
-               WHERE t.data = :selected_date
-           """)
+            SELECT 
+                CONCAT(s.F_sotr, ' ', s.I_sotr, ' ', s.O_sotr) AS ФИО, 
+                t.nachal_rab_den, 
+                t.okonch_rab_den, 
+                t.dlit
+            FROM dbo.TYRV t
+            JOIN dbo.accounts a ON t.accounts2_id = a.id_accounts
+            JOIN dbo.sotr s ON a.sotr_id = s.id_sotr
+            WHERE t.data = :selected_date
+        """)
         query.bindValue(":selected_date", selected_date)
 
         if query.exec():
@@ -138,9 +150,10 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
         else:
             QMessageBox.warning(self, "Ошибка", "Не удалось сформировать отчет")
 
-    def po_generate_report(self):  # Генерирует отчет о запущенных процессах для выбранного пользователя
-        selected_user_id = self.selectPoUser.currentData()  # Получаем ID выбранного пользователя
-        selected_date = self.reportDate.date().toString("dd-MM-yyyy")  # Получаем выбранную дату
+    def po_generate_report(self):
+        # Генерирует отчет о запущенных процессах для выбранного пользователя
+        selected_user_id = self.selectPoUser.currentData()
+        selected_date = self.poDate.date().toString("dd-MM-yyyy")
 
         if not selected_user_id:
             QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите сотрудника.")
@@ -163,7 +176,6 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
             model.setHeaderData(1, Qt.Orientation.Horizontal, "Запущенные процессы")
 
             self.otchetTable.setModel(model)
-
             self.otchetTable.resizeColumnsToContents()
             self.otchetTable.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         else:
@@ -177,14 +189,14 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
         """Обрабатывает закрытие формы."""
         event.accept()
 
-    def exportToExcel(self): # Экспортирует данные из таблицы в файл Excel.
-        # Получаем модель таблицы
+    def exportToExcel(self):
+        # Экспортирует данные из таблицы в файл Excel
         model = self.otchetTable.model()
 
-        # Проверяем, что таблица не пустая
         if model is None or model.rowCount() == 0:
             QMessageBox.warning(self, "Ошибка", "Нет данных для экспорта. Сформируйте отчет.")
             return
+
         if self.userReport.isChecked():
             report_type = "Отчет по пользователю"
         else:
@@ -194,7 +206,6 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
         formatted_datetime = current_datetime.toString("dd-MM-yyyy_hh-mm")
         file_name = f"{report_type}_{formatted_datetime}.xlsx"
 
-        # Открываем окно для сохранения файла
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Сохранить файл Excel",
@@ -205,17 +216,14 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
         if not file_path:
             return
 
-        # Создаем новый Excel-файл
         workbook = Workbook()
         sheet = workbook.active
 
-        # Записываем заголовки столбцов
         headers = []
         for col in range(model.columnCount()):
             headers.append(model.headerData(col, Qt.Orientation.Horizontal))
         sheet.append(headers)
 
-        # Записываем данные из таблицы
         for row in range(model.rowCount()):
             row_data = []
             for col in range(model.columnCount()):
@@ -223,7 +231,6 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
                 row_data.append(model.data(index))
             sheet.append(row_data)
 
-        # Сохраняем файл
         try:
             workbook.save(file_path)
             QMessageBox.information(self, "Успех", f"Данные успешно экспортированы в файл:\n{file_path}")

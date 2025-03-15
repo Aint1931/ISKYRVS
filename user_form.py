@@ -37,7 +37,7 @@ class UchetForm(QMainWindow, Ui_uchet):
         self.finishBtn.setEnabled(True)
 
 
-        self.active_processes = self.get_active_processes()
+        self.active_processes = self.getActiveProcesses()
 
     def finish_work(self):
         msg_box = QMessageBox(self)
@@ -53,12 +53,12 @@ class UchetForm(QMainWindow, Ui_uchet):
             duration = self.start_time.secsTo(end_time)
 
             # Сохранение данных рабочего дня
-            self.save_work_day(self.start_time.toString("HH:mm:ss"),
+            self.saveWorkDay(self.start_time.toString("HH:mm:ss"),
                                end_time.toString("HH:mm:ss"),
                                duration)
 
             # Сохранение уникальных активных приложений
-            self.save_active_apps(self.active_processes)
+            self.saveAtiveApps(self.active_processes)
 
             self.startBtn.setEnabled(True)
             self.finishBtn.setEnabled(False)
@@ -71,7 +71,7 @@ class UchetForm(QMainWindow, Ui_uchet):
         self.labelTime.setText(
             f"Время активности: {duration // 3600:02}:{(duration % 3600) // 60:02}:{duration % 60:02}")
 
-    def get_active_processes(self): # Получает список всех запущенных приложений
+    def getActiveProcesses(self): # Получает список всех запущенных приложений
         processes = set()
         for proc in psutil.process_iter(['pid', 'name']):
             try:
@@ -80,7 +80,8 @@ class UchetForm(QMainWindow, Ui_uchet):
                 pass
         return processes
 
-    def save_work_day(self, start_time, end_time, duration_seconds): #Сохранить данные о рабочем дне
+    def saveWorkDay(self, start_time, end_time, duration_seconds):
+        # Сохранить данные о рабочем дне
         hours, remainder = divmod(duration_seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
         dlit = f"{hours:02}:{minutes:02}:{seconds:02}"
@@ -97,13 +98,11 @@ class UchetForm(QMainWindow, Ui_uchet):
         if not query.exec():
             print("Ошибка при сохранении данных:", query.lastError().text())
 
-    def save_active_apps(self, active_processes): # Сохраняет данные о приложениях в БД
+    def saveActiveApps(self, active_processes):
+        # Сохраняет данные о приложениях в БД с использованием хранимой процедуры add_PO
         for app in active_processes:
             query = QSqlQuery()
-            query.prepare("""
-                INSERT INTO dbo.PO (nazv_po, data_ychet_po, accounts1_id)
-                VALUES (:nazv_po, :data_ychet_po, :user_id)
-            """)
+            query.prepare("EXEC dbo.add_PO @nazv_po = :nazv_po, @data_ychet_po = :data_ychet_po, @accounts1_id = :user_id")
             query.bindValue(":nazv_po", app)  # Название приложения
             query.bindValue(":data_ychet_po", QDateTime.currentDateTime().toString("dd-MM-yyyy"))
             query.bindValue(":user_id", self.user_id)

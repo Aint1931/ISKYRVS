@@ -1,8 +1,10 @@
+import hashlib
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtSql import QSqlQuery, QSqlTableModel
 from PyQt6.QtWidgets import QMainWindow, QHeaderView, QMessageBox, QDialog, QLineEdit, QVBoxLayout, QPushButton, \
     QCheckBox, QTableView
+
 
 from adminFormDesign import Ui_adminForm
 
@@ -39,7 +41,11 @@ class AdminForm(QMainWindow, Ui_adminForm):
 
     def usersList(self):  # Заполняет ComboBox данными о сотрудниках из базы данных.
         query = QSqlQuery()
-        query.exec("SELECT id_accounts, F_sotr, I_sotr, O_sotr FROM dbo.accounts")
+        query.exec("""
+            SELECT a.id_accounts, s.F_sotr, s.I_sotr, s.O_sotr
+            FROM dbo.accounts a
+            JOIN dbo.sotr s ON a.sotr_id = s.id_sotr
+        """)
         self.selectPolz.clear()
         self.selectPolz.addItem("- Выберите пользователя -", None)
         while query.next():
@@ -48,28 +54,22 @@ class AdminForm(QMainWindow, Ui_adminForm):
             self.selectPolz.addItem(user_name, user_id)
 
     def polzTableShowData(self):  # Выводит данные о пользователях в таблицу.
-
         model = QSqlTableModel()
         model.setTable("accounts")
-
         model.setHeaderData(0, Qt.Orientation.Horizontal, "ID")
         model.setHeaderData(1, Qt.Orientation.Horizontal, "Логин")
         model.setHeaderData(2, Qt.Orientation.Horizontal, "Пароль")
         model.setHeaderData(3, Qt.Orientation.Horizontal, "Администратор")
         model.setHeaderData(4, Qt.Orientation.Horizontal, "Руководитель")
-        model.setHeaderData(6, Qt.Orientation.Horizontal, "Фамилия")
-        model.setHeaderData(7, Qt.Orientation.Horizontal, "Имя")
-        model.setHeaderData(8, Qt.Orientation.Horizontal, "Отчество")
-        model.setHeaderData(9, Qt.Orientation.Horizontal, "Должность")
-
+        model.setHeaderData(5, Qt.Orientation.Horizontal, "Супер-админ")
+        model.setHeaderData(6, Qt.Orientation.Horizontal, "ID сотрудника")
         model.select()
 
         self.polzTable.setModel(model)
 
-        self.polzTable.setColumnHidden(3, True)  # Скрыть столбец "Администратор"
-        self.polzTable.setColumnHidden(4, True)  # Скрыть столбец "Руководитель"
+        # Скрываем ненужные столбцы
         self.polzTable.setColumnHidden(2, True)  # Скрываем столбец с паролем
-        self.polzTable.setColumnHidden(5, True)  # Скрыть столбец "Руководитель"
+        self.polzTable.setColumnHidden(6, True)  # Скрываем столбец с ID сотрудника
 
         self.polzTable.resizeColumnsToContents()
         self.polzTable.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -87,9 +87,11 @@ class AdminForm(QMainWindow, Ui_adminForm):
         # Загружаем данные о пользователе
         query = QSqlQuery()
         query.prepare("""
-            SELECT user_login, F_sotr, I_sotr, O_sotr, dolj, administrator, supervisor
-            FROM dbo.accounts
-            WHERE id_accounts = :user_id
+            SELECT a.user_login, s.F_sotr, s.I_sotr, s.O_sotr, d.dolj, a.administrator, a.supervisor
+            FROM dbo.accounts a
+            JOIN dbo.sotr s ON a.sotr_id = s.id_sotr
+            JOIN dbo.dolj d ON s.dolj_id = d.id_dolj
+            WHERE a.id_accounts = :user_id
         """)
         query.bindValue(":user_id", user_id)
 
@@ -101,7 +103,7 @@ class AdminForm(QMainWindow, Ui_adminForm):
             self.adminCheck.setChecked(query.value("administrator"))
             self.supervisorCheck.setChecked(query.value("supervisor"))
 
-    def userDataUpdate(self):  # Обновляет данные пользователя в базе данных.
+    def userDataUpdate(self):
         user_id = self.selectPolz.currentData()
 
         if user_id is None:
@@ -120,30 +122,30 @@ class AdminForm(QMainWindow, Ui_adminForm):
             QMessageBox.warning(self, "Ошибка", "Все поля должны быть заполнены.")
             return
 
-        # Обновляем данные в базе
+        # Вызываем хранимую процедуру UpdateSotrInfo
         query = QSqlQuery()
-        query.prepare("""
-            UPDATE dbo.accounts
-            SET F_sotr = :fam, I_sotr = :name, O_sotr = :otch, dolj = :dolj,
-                administrator = :is_admin, supervisor = :is_supervisor
-            WHERE id_accounts = :user_id
-        """)
+        query.prepare(
+            "EXEC [DBO].[UpdateSotrInfo] @id_sotr = :user_id, @F_sotr = :fam, @I_sotr = :name, @O_sotr = :otch, "
+            "@nazvanie_dolj = :dolj, @user_login = :login, @user_password = :password, "
+            "@administrator = :is_admin, @supervisor = :is_supervisor, @superadmin = :is_superadmin")
+        query.bindValue(":user_id", user_id)
         query.bindValue(":fam", fam)
         query.bindValue(":name", name)
         query.bindValue(":otch", otch)
         query.bindValue(":dolj", dolj)
+        query.bindValue(":login", "")  # Логин не изменяем, передаем пустую строку
+        query.bindValue(":password", "")  # Пароль не изменяем, передаем пустую строку
         query.bindValue(":is_admin", is_admin)
         query.bindValue(":is_supervisor", is_supervisor)
-        query.bindValue(":user_id", user_id)
+        query.bindValue(":is_superadmin", False)  # Если супер-админ не используется, передаем False
 
         if query.exec():
             QMessageBox.information(self, "Успех", "Данные пользователя обновлены.")
             self.polzTableShowData()  # Обновляем таблицу
         else:
-            QMessageBox.warning(self, "Ошибка", "Не удалось обновить данные пользователя.")
+            QMessageBox.warning(self, "Ошибка", f"Ошибка обновления данных: {query.lastError().text()}")
 
     def changePasswordFormShow(self):
-        """Открывает диалоговое окно для изменения пароля."""
         user_id = self.selectPolz.currentData()
 
         if user_id is None:
@@ -162,19 +164,19 @@ class AdminForm(QMainWindow, Ui_adminForm):
         newPasswordEdit = QLineEdit(dialog)
         newPasswordEdit.setPlaceholderText("Новый пароль")
         newPasswordEdit.setEchoMode(QLineEdit.EchoMode.Password)
-        newPasswordEdit.setFont(font)  # Устанавливаем шрифт
+        newPasswordEdit.setFont(font)
         layout.addWidget(newPasswordEdit)
 
         confirmPasswordEdit = QLineEdit(dialog)
         confirmPasswordEdit.setPlaceholderText("Повторите пароль")
         confirmPasswordEdit.setEchoMode(QLineEdit.EchoMode.Password)
-        confirmPasswordEdit.setFont(font)  # Устанавливаем шрифт
+        confirmPasswordEdit.setFont(font)
         layout.addWidget(confirmPasswordEdit)
 
         save_btn = QPushButton("Сохранить", dialog)
-        save_btn.setFont(font)  # Устанавливаем шрифт
+        save_btn.setFont(font)
         cancel_btn = QPushButton("Отмена", dialog)
-        cancel_btn.setFont(font)  # Устанавливаем шрифт
+        cancel_btn.setFont(font)
 
         layout.addWidget(save_btn)
         layout.addWidget(cancel_btn)
@@ -186,10 +188,17 @@ class AdminForm(QMainWindow, Ui_adminForm):
         dialog.setLayout(layout)
         dialog.exec()
 
-    def updatePassword(self, user_id, new_password, confirm_password, dialog):  # Изменяет пароль пользователя.
+    def hash_password(self, password):
+        # Хэшируем пароль с использованием SHA-256
+        return hashlib.sha256(password.encode()).hexdigest()
+
+    def updatePassword(self, user_id, new_password, confirm_password, dialog):
         if new_password != confirm_password:
             QMessageBox.warning(self, "Ошибка", "Пароли не совпадают.")
             return
+
+        # Хешируем пароль
+        hashed_password = self.hash_password(new_password)
 
         query = QSqlQuery()
         query.prepare("""
@@ -197,7 +206,7 @@ class AdminForm(QMainWindow, Ui_adminForm):
             SET user_password = :password
             WHERE id_accounts = :user_id
         """)
-        query.bindValue(":password", new_password)
+        query.bindValue(":password", hashed_password)  # Используем хешированный пароль
         query.bindValue(":user_id", user_id)
 
         if query.exec():
@@ -205,7 +214,7 @@ class AdminForm(QMainWindow, Ui_adminForm):
             self.polzTableShowData()
             dialog.close()
         else:
-            QMessageBox.warning(self, "Ошибка", "Не удалось изменить пароль.")
+            QMessageBox.warning(self, "Ошибка", f"Не удалось изменить пароль: {query.lastError().text()}")
 
     def clearData(self):  # Сбрасывает форму к исходному состоянию.
         self.selectPolz.setCurrentIndex(0)  # Сбрасываем выбор пользователя
@@ -218,7 +227,6 @@ class AdminForm(QMainWindow, Ui_adminForm):
         self.supervisorCheck.setChecked(False)
 
     def addUserForm(self):  # Открывает диалоговое окно для добавления нового сотрудника.
-
         dialog = QDialog(self)
         dialog.setWindowTitle("Добавить нового сотрудника")
         dialog.setModal(True)
@@ -263,12 +271,11 @@ class AdminForm(QMainWindow, Ui_adminForm):
         adminCheck.setFont(font)
         layout.addWidget(adminCheck)
         if not self.is_superadmin:
-            self.adminCheck.setEnabled(False)
+            adminCheck.setEnabled(False)
 
         supervisorCheck = QCheckBox("Руководитель", dialog)
         supervisorCheck.setFont(font)
         layout.addWidget(supervisorCheck)
-
 
         save_btn = QPushButton("Сохранить", dialog)
         save_btn.setFont(font)
@@ -277,7 +284,6 @@ class AdminForm(QMainWindow, Ui_adminForm):
 
         layout.addWidget(save_btn)
         layout.addWidget(cancel_btn)
-
 
         save_btn.clicked.connect(
             lambda: self.saveNewUser(
@@ -297,37 +303,29 @@ class AdminForm(QMainWindow, Ui_adminForm):
         dialog.setLayout(layout)
         dialog.exec()
 
-    def saveNewUser(self, fam, name, otch, login, password, dolj, is_admin, is_supervisor, dialog): # Сохраняет нового сотрудника в базу данных.
+    def saveNewUser(self, fam, name, otch, login, password, dolj, is_admin, is_supervisor, dialog):
         # Проверка на пустые поля
         if not fam or not name or not otch or not login or not password or not dolj:
             QMessageBox.warning(self, "Ошибка", "Все поля должны быть заполнены.")
             return
 
-        # Добавляем данные в базу
+        # Хешируем пароль
+        hashed_password = self.hash_password(password)
+
+        # Вызываем хранимую процедуру AddSotrInfo
         query = QSqlQuery()
-        query.prepare("""
-            INSERT INTO dbo.accounts (
-            user_login, 
-            user_password, 
-            F_sotr, 
-            I_sotr, 
-            O_sotr, 
-            dolj, 
-            administrator, 
-            supervisor, 
-            superadmin
-            )
-            VALUES (:login, :password, :fam, :name, :otch, :dolj, :is_admin, :is_supervisor, :is_superadmin)
-        """)
-        query.bindValue(":login", login)
-        query.bindValue(":password", password)
+        query.prepare("EXEC [DBO].[AddSotrInfo] @F_sotr = :fam, @I_sotr = :name, @O_sotr = :otch, "
+                      "@nazvanie_dolj = :dolj, @user_login = :login, @user_password = :password, "
+                      "@administrator = :is_admin, @supervisor = :is_supervisor, @superadmin = :is_superadmin")
         query.bindValue(":fam", fam)
         query.bindValue(":name", name)
         query.bindValue(":otch", otch)
         query.bindValue(":dolj", dolj)
+        query.bindValue(":login", login)
+        query.bindValue(":password", hashed_password)  # Используем хешированный пароль
         query.bindValue(":is_admin", is_admin)
         query.bindValue(":is_supervisor", is_supervisor)
-        query.bindValue(":is_superadmin", False)
+        query.bindValue(":is_superadmin", False)  # Если супер-админ не используется, передаем False
 
         if query.exec():
             QMessageBox.information(self, "Успех", "Новый сотрудник успешно добавлен.")
@@ -335,4 +333,4 @@ class AdminForm(QMainWindow, Ui_adminForm):
             self.usersList()  # Обновляем ComboBox
             dialog.close()
         else:
-            QMessageBox.warning(self, "Ошибка", "Не удалось добавить сотрудника.")
+            QMessageBox.warning(self, "Ошибка", f"Ошибка добавления сотрудника: {query.lastError().text()}")
