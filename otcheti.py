@@ -186,7 +186,6 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
         self.admin_form.show()
 
     def closeEvent(self, event):
-        """Обрабатывает закрытие формы."""
         event.accept()
 
     def exportToExcel(self):

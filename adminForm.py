@@ -20,15 +20,13 @@ class AdminForm(QMainWindow, Ui_adminForm):
         self.updatePolzBtn.clicked.connect(self.userDataUpdate)
         self.updatePasswordBtn.clicked.connect(self.changePasswordFormShow)
         self.clearBtn.clicked.connect(self.clearData)
-        self.addPolzBtn.clicked.connect(self.addUserForm)  # Подключаем кнопку добавления сотрудника
+        self.addPolzBtn.clicked.connect(self.addUserForm)
 
-        # Делаем кнопки и поля неактивными до выбора пользователя
         self.upFrameEnabled(False)
         if not self.is_superadmin:
             self.adminCheck.setEnabled(False)
 
     def upFrameEnabled(self, enabled):
-        """Активирует или деактивирует поля и кнопки."""
         self.fEdit.setEnabled(enabled)
         self.iEdit.setEnabled(enabled)
         self.oEdit.setEnabled(enabled)
@@ -39,7 +37,7 @@ class AdminForm(QMainWindow, Ui_adminForm):
         self.updatePolzBtn.setEnabled(enabled)
         self.updatePasswordBtn.setEnabled(enabled)
 
-    def usersList(self):  # Заполняет ComboBox данными о сотрудниках из базы данных.
+    def usersList(self):
         query = QSqlQuery()
         query.exec("""
             SELECT a.id_accounts, s.F_sotr, s.I_sotr, s.O_sotr
@@ -53,7 +51,7 @@ class AdminForm(QMainWindow, Ui_adminForm):
             user_name = f"{query.value(1)} {query.value(2)} {query.value(3)}"
             self.selectPolz.addItem(user_name, user_id)
 
-    def polzTableShowData(self):  # Выводит данные о пользователях в таблицу.
+    def polzTableShowData(self):
         model = QSqlTableModel()
         model.setTable("accounts")
         model.setHeaderData(0, Qt.Orientation.Horizontal, "ID")
@@ -67,24 +65,23 @@ class AdminForm(QMainWindow, Ui_adminForm):
 
         self.polzTable.setModel(model)
 
-        # Скрываем ненужные столбцы
-        self.polzTable.setColumnHidden(2, True)  # Скрываем столбец с паролем
-        self.polzTable.setColumnHidden(6, True)  # Скрываем столбец с ID сотрудника
+        self.polzTable.setColumnHidden(2, True)
+        self.polzTable.setColumnHidden(6, True)
 
         self.polzTable.resizeColumnsToContents()
         self.polzTable.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
-    def userSelected(self, index):  # Загружает данные о выбранном пользователе в форму.
+    def userSelected(self, index):
         user_id = self.selectPolz.currentData()
 
         if user_id is None:
             self.upFrameEnabled(False)
             return
 
-        # Активируем форму
+
         self.upFrameEnabled(True)
 
-        # Загружаем данные о пользователе
+
         query = QSqlQuery()
         query.prepare("""
             SELECT a.user_login, s.F_sotr, s.I_sotr, s.O_sotr, d.dolj, a.administrator, a.supervisor
@@ -110,7 +107,7 @@ class AdminForm(QMainWindow, Ui_adminForm):
             QMessageBox.warning(self, "Ошибка", "Пользователь не выбран.")
             return
 
-        # Получаем данные из формы
+
         fam = self.fEdit.text()
         name = self.iEdit.text()
         otch = self.oEdit.text()
@@ -122,7 +119,7 @@ class AdminForm(QMainWindow, Ui_adminForm):
             QMessageBox.warning(self, "Ошибка", "Все поля должны быть заполнены.")
             return
 
-        # Вызываем хранимую процедуру UpdateSotrInfo
+
         query = QSqlQuery()
         query.prepare(
             "EXEC [DBO].[UpdateSotrInfo] @id_sotr = :user_id, @F_sotr = :fam, @I_sotr = :name, @O_sotr = :otch, "
@@ -133,15 +130,15 @@ class AdminForm(QMainWindow, Ui_adminForm):
         query.bindValue(":name", name)
         query.bindValue(":otch", otch)
         query.bindValue(":dolj", dolj)
-        query.bindValue(":login", "")  # Логин не изменяем, передаем пустую строку
-        query.bindValue(":password", "")  # Пароль не изменяем, передаем пустую строку
+        query.bindValue(":login", "")
+        query.bindValue(":password", "")
         query.bindValue(":is_admin", is_admin)
         query.bindValue(":is_supervisor", is_supervisor)
-        query.bindValue(":is_superadmin", False)  # Если супер-админ не используется, передаем False
+        query.bindValue(":is_superadmin", False)
 
         if query.exec():
             QMessageBox.information(self, "Успех", "Данные пользователя обновлены.")
-            self.polzTableShowData()  # Обновляем таблицу
+            self.polzTableShowData()
         else:
             QMessageBox.warning(self, "Ошибка", f"Ошибка обновления данных: {query.lastError().text()}")
 
@@ -189,7 +186,7 @@ class AdminForm(QMainWindow, Ui_adminForm):
         dialog.exec()
 
     def hash_password(self, password):
-        # Хэшируем пароль с использованием SHA-256
+
         return hashlib.sha256(password.encode()).hexdigest()
 
     def updatePassword(self, user_id, new_password, confirm_password, dialog):
@@ -197,7 +194,6 @@ class AdminForm(QMainWindow, Ui_adminForm):
             QMessageBox.warning(self, "Ошибка", "Пароли не совпадают.")
             return
 
-        # Хешируем пароль
         hashed_password = self.hash_password(new_password)
 
         query = QSqlQuery()
@@ -206,7 +202,7 @@ class AdminForm(QMainWindow, Ui_adminForm):
             SET user_password = :password
             WHERE id_accounts = :user_id
         """)
-        query.bindValue(":password", hashed_password)  # Используем хешированный пароль
+        query.bindValue(":password", hashed_password)
         query.bindValue(":user_id", user_id)
 
         if query.exec():
@@ -216,8 +212,8 @@ class AdminForm(QMainWindow, Ui_adminForm):
         else:
             QMessageBox.warning(self, "Ошибка", f"Не удалось изменить пароль: {query.lastError().text()}")
 
-    def clearData(self):  # Сбрасывает форму к исходному состоянию.
-        self.selectPolz.setCurrentIndex(0)  # Сбрасываем выбор пользователя
+    def clearData(self):
+        self.selectPolz.setCurrentIndex(0)
         self.upFrameEnabled(False)
         self.fEdit.clear()
         self.iEdit.clear()
@@ -226,7 +222,7 @@ class AdminForm(QMainWindow, Ui_adminForm):
         self.adminCheck.setChecked(False)
         self.supervisorCheck.setChecked(False)
 
-    def addUserForm(self):  # Открывает диалоговое окно для добавления нового сотрудника.
+    def addUserForm(self):
         dialog = QDialog(self)
         dialog.setWindowTitle("Добавить нового сотрудника")
         dialog.setModal(True)
@@ -304,15 +300,12 @@ class AdminForm(QMainWindow, Ui_adminForm):
         dialog.exec()
 
     def saveNewUser(self, fam, name, otch, login, password, dolj, is_admin, is_supervisor, dialog):
-        # Проверка на пустые поля
         if not fam or not name or not otch or not login or not password or not dolj:
             QMessageBox.warning(self, "Ошибка", "Все поля должны быть заполнены.")
             return
 
-        # Хешируем пароль
         hashed_password = self.hash_password(password)
 
-        # Вызываем хранимую процедуру AddSotrInfo
         query = QSqlQuery()
         query.prepare("EXEC [DBO].[AddSotrInfo] @F_sotr = :fam, @I_sotr = :name, @O_sotr = :otch, "
                       "@nazvanie_dolj = :dolj, @user_login = :login, @user_password = :password, "
@@ -322,15 +315,15 @@ class AdminForm(QMainWindow, Ui_adminForm):
         query.bindValue(":otch", otch)
         query.bindValue(":dolj", dolj)
         query.bindValue(":login", login)
-        query.bindValue(":password", hashed_password)  # Используем хешированный пароль
+        query.bindValue(":password", hashed_password)
         query.bindValue(":is_admin", is_admin)
         query.bindValue(":is_supervisor", is_supervisor)
-        query.bindValue(":is_superadmin", False)  # Если супер-админ не используется, передаем False
+        query.bindValue(":is_superadmin", False)
 
         if query.exec():
             QMessageBox.information(self, "Успех", "Новый сотрудник успешно добавлен.")
-            self.polzTableShowData()  # Обновляем таблицу
-            self.usersList()  # Обновляем ComboBox
+            self.polzTableShowData()
+            self.usersList()
             dialog.close()
         else:
             QMessageBox.warning(self, "Ошибка", f"Ошибка добавления сотрудника: {query.lastError().text()}")

@@ -1,7 +1,7 @@
 USE [mdu]
 GO
 
--- Создаем таблицы
+
 CREATE TABLE [DBO].[dolj]
 (
     [id_dolj] INT NOT NULL IDENTITY(1,1),
@@ -71,7 +71,7 @@ CREATE TABLE [DBO].[web]
 );
 GO
 
--- Создаем процедуры
+
 CREATE PROCEDURE [DBO].[AddSotrInfo]
     @F_sotr VARCHAR(MAX),
     @I_sotr VARCHAR(MAX),
@@ -86,13 +86,9 @@ AS
 BEGIN
     DECLARE @dolj_id INT;
     DECLARE @sotr_id INT;
-
-    -- Проверяем, существует ли должность
     SELECT @dolj_id = id_dolj
     FROM [DBO].[dolj]
     WHERE dolj = @nazvanie_dolj;
-
-    -- Если должность не существует, добавляем её
     IF @dolj_id IS NULL
     BEGIN
         INSERT INTO [DBO].[dolj] (dolj)
@@ -100,14 +96,11 @@ BEGIN
         SET @dolj_id = SCOPE_IDENTITY();
     END;
 
-    -- Добавляем сотрудника
     INSERT INTO [DBO].[sotr] (F_sotr, I_sotr, O_sotr, dolj_id)
     VALUES (@F_sotr, @I_sotr, @O_sotr, @dolj_id);
 
-    -- Получаем ID добавленного сотрудника
     SET @sotr_id = SCOPE_IDENTITY();
 
-    -- Добавляем учетную запись
     INSERT INTO [DBO].[accounts] (user_login, user_password, administrator, supervisor, superadmin, sotr_id)
     VALUES (@user_login, @user_password, @administrator, @supervisor, @superadmin, @sotr_id);
 END;
@@ -127,29 +120,21 @@ CREATE PROCEDURE [DBO].[UpdateSotrInfo]
 AS
 BEGIN
     DECLARE @dolj_id INT;
-
-    -- Проверяем, существует ли должность
     SELECT @dolj_id = id_dolj
     FROM [DBO].[dolj]
     WHERE dolj = @nazvanie_dolj;
-
-    -- Если должность не существует, добавляем её
     IF @dolj_id IS NULL
     BEGIN
         INSERT INTO [DBO].[dolj] (dolj)
         VALUES (@nazvanie_dolj);
         SET @dolj_id = SCOPE_IDENTITY();
     END;
-
-    -- Обновляем данные сотрудника
     UPDATE [DBO].[sotr]
     SET F_sotr = @F_sotr,
         I_sotr = @I_sotr,
         O_sotr = @O_sotr,
         dolj_id = @dolj_id
     WHERE id_sotr = @id_sotr;
-
-    -- Обновляем учетную запись
     UPDATE [DBO].[accounts]
     SET user_login = @user_login,
         user_password = @user_password,

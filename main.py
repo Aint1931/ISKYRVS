@@ -15,7 +15,7 @@ class AuthApp(QMainWindow, Ui_Authorization):
         self.is_supervisor = False
         self.is_superadmin = False
         self.user_id = None
-        self.user_dolj = None  # Добавляем поле для хранения должности пользователя
+        self.user_dolj = None
 
         # Подключение к базе данных
         self.db = QSqlDatabase.addDatabase("QODBC")
@@ -29,14 +29,12 @@ class AuthApp(QMainWindow, Ui_Authorization):
         self.showPassword.stateChanged.connect(self.toggle_password_visibility)
 
     def toggle_password_visibility(self, state):
-        # Если чекбокс отмечен, показываем пароль
         if state == 2:
             self.pasEdit.setEchoMode(QLineEdit.EchoMode.Normal)
         else:
             self.pasEdit.setEchoMode(QLineEdit.EchoMode.Password)
 
     def hash_password(self, password):
-        # Хэшируем пароль с использованием SHA-256
         return hashlib.sha256(password.encode()).hexdigest()
 
     def on_login(self):
@@ -46,7 +44,6 @@ class AuthApp(QMainWindow, Ui_Authorization):
             QMessageBox.warning(self, "Ошибка", "Логин и пароль не могут быть пустыми")
             return
 
-        # Хэшируем пароль
         hashed_password = self.hash_password(password)
 
         query = QSqlQuery()
@@ -59,7 +56,7 @@ class AuthApp(QMainWindow, Ui_Authorization):
             self.is_supervisor = query.value("supervisor")
             self.is_superadmin = query.value("superadmin")
             self.user_id = query.value("id_accounts")
-            self.user_dolj = query.value("dolj")  # Получаем должность пользователя
+            self.user_dolj = query.value("dolj")
 
             QMessageBox.information(self, "Успех", f"Авторизация прошла успешно!\nДолжность: {self.user_dolj}")
             self.hide()

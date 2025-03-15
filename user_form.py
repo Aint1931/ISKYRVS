@@ -2,7 +2,7 @@ import psutil
 from PyQt6.QtWidgets import QMainWindow, QMessageBox
 from PyQt6.QtCore import QTimer, QDateTime
 from PyQt6.QtSql import QSqlQuery
-from user_form_design import Ui_uchet  # Импортируйте сгенерированный класс формы
+from user_form_design import Ui_uchet
 
 
 class UchetForm(QMainWindow, Ui_uchet):
@@ -15,7 +15,7 @@ class UchetForm(QMainWindow, Ui_uchet):
         self.timer.timeout.connect(self.update_time)
         self.startBtn.clicked.connect(self.start_work)
         self.finishBtn.clicked.connect(self.finish_work)
-        self.active_processes = set()  # Используем множество для уникальных приложений
+        self.active_processes = set()
 
     def start_work(self):
         query = QSqlQuery()
@@ -99,7 +99,6 @@ class UchetForm(QMainWindow, Ui_uchet):
             print("Ошибка при сохранении данных:", query.lastError().text())
 
     def saveActiveApps(self, active_processes):
-        # Сохраняет данные о приложениях в БД с использованием хранимой процедуры add_PO
         for app in active_processes:
             query = QSqlQuery()
             query.prepare("EXEC dbo.add_PO @nazv_po = :nazv_po, @data_ychet_po = :data_ychet_po, @accounts1_id = :user_id")
