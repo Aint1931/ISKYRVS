@@ -1,15 +1,15 @@
 import hashlib
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
-from PyQt6.QtSql import QSqlQuery, QSqlTableModel
+from PyQt6.QtSql import QSqlQuery, QSqlTableModel, QSqlQueryModel
 from PyQt6.QtWidgets import QMainWindow, QHeaderView, QMessageBox, QDialog, QLineEdit, QVBoxLayout, QPushButton, \
     QCheckBox, QTableView
 
 
-from adminFormDesign import Ui_adminForm
+from adminFormSotrDesign import Ui_adminFormSotr
 
 
-class AdminForm(QMainWindow, Ui_adminForm):
+class AdminForm(QMainWindow, Ui_adminFormSotr):
     def __init__(self, is_superadmin):
         super().__init__()
         self.setupUi(self)
@@ -21,7 +21,10 @@ class AdminForm(QMainWindow, Ui_adminForm):
         self.updatePasswordBtn.clicked.connect(self.changePasswordFormShow)
         self.clearBtn.clicked.connect(self.clearData)
         self.addPolzBtn.clicked.connect(self.addUserForm)
-
+        self.menuSotr.setEnabled(False)
+        self.menuTime.triggered.connect(self.open_time_form)
+        self.menuPo.triggered.connect(self.open_po_form)
+        self.menuWeb.triggered.connect(self.open_web_form)
         self.upFrameEnabled(False)
         if not self.is_superadmin:
             self.adminCheck.setEnabled(False)
@@ -52,22 +55,32 @@ class AdminForm(QMainWindow, Ui_adminForm):
             self.selectPolz.addItem(user_name, user_id)
 
     def polzTableShowData(self):
-        model = QSqlTableModel()
-        model.setTable("accounts")
-        model.setHeaderData(0, Qt.Orientation.Horizontal, "ID")
-        model.setHeaderData(1, Qt.Orientation.Horizontal, "Логин")
-        model.setHeaderData(2, Qt.Orientation.Horizontal, "Пароль")
-        model.setHeaderData(3, Qt.Orientation.Horizontal, "Администратор")
-        model.setHeaderData(4, Qt.Orientation.Horizontal, "Руководитель")
-        model.setHeaderData(5, Qt.Orientation.Horizontal, "Супер-админ")
-        model.setHeaderData(6, Qt.Orientation.Horizontal, "ID сотрудника")
-        model.select()
-
+        model = QSqlQueryModel()
+        query = """
+            SELECT 
+                a.id_accounts AS 'ID',
+                a.user_login AS 'Логин',
+                a.user_password AS 'Пароль',
+                a.administrator AS 'Администратор',
+                a.supervisor AS 'Руководитель',
+                a.superadmin AS 'Супер-админ',
+                s.F_sotr AS 'Фамилия',
+                s.I_sotr AS 'Имя',
+                s.O_sotr AS 'Отчество',
+                d.dolj AS 'Должность'
+            FROM 
+                accounts a
+            JOIN 
+                sotr s ON a.sotr_id = s.id_sotr
+            JOIN 
+                dolj d ON s.dolj_id = d.id_dolj
+        """
+        model.setQuery(query)
         self.polzTable.setModel(model)
-
         self.polzTable.setColumnHidden(2, True)
-        self.polzTable.setColumnHidden(6, True)
-
+        self.polzTable.setColumnHidden(3, True)
+        self.polzTable.setColumnHidden(4, True)
+        self.polzTable.setColumnHidden(5, True)
         self.polzTable.resizeColumnsToContents()
         self.polzTable.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
@@ -107,7 +120,6 @@ class AdminForm(QMainWindow, Ui_adminForm):
             QMessageBox.warning(self, "Ошибка", "Пользователь не выбран.")
             return
 
-
         fam = self.fEdit.text()
         name = self.iEdit.text()
         otch = self.oEdit.text()
@@ -118,9 +130,15 @@ class AdminForm(QMainWindow, Ui_adminForm):
         if not fam or not name or not otch or not dolj:
             QMessageBox.warning(self, "Ошибка", "Все поля должны быть заполнены.")
             return
-
-
         query = QSqlQuery()
+        query.prepare("SELECT user_login, user_password FROM dbo.accounts WHERE sotr_id = :user_id")
+        query.bindValue(":user_id", user_id)
+        if query.exec() and query.next():
+            current_login = query.value(0)
+            current_password = query.value(1)
+        else:
+            QMessageBox.warning(self, "Ошибка", "Не удалось получить текущие данные пользователя.")
+            return
         query.prepare(
             "EXEC [DBO].[UpdateSotrInfo] @id_sotr = :user_id, @F_sotr = :fam, @I_sotr = :name, @O_sotr = :otch, "
             "@nazvanie_dolj = :dolj, @user_login = :login, @user_password = :password, "
@@ -130,8 +148,8 @@ class AdminForm(QMainWindow, Ui_adminForm):
         query.bindValue(":name", name)
         query.bindValue(":otch", otch)
         query.bindValue(":dolj", dolj)
-        query.bindValue(":login", "")
-        query.bindValue(":password", "")
+        query.bindValue(":login", current_login)
+        query.bindValue(":password", current_password)
         query.bindValue(":is_admin", is_admin)
         query.bindValue(":is_supervisor", is_supervisor)
         query.bindValue(":is_superadmin", False)
@@ -139,6 +157,7 @@ class AdminForm(QMainWindow, Ui_adminForm):
         if query.exec():
             QMessageBox.information(self, "Успех", "Данные пользователя обновлены.")
             self.polzTableShowData()
+            self.usersList()
         else:
             QMessageBox.warning(self, "Ошибка", f"Ошибка обновления данных: {query.lastError().text()}")
 
@@ -327,3 +346,25 @@ class AdminForm(QMainWindow, Ui_adminForm):
             dialog.close()
         else:
             QMessageBox.warning(self, "Ошибка", f"Ошибка добавления сотрудника: {query.lastError().text()}")
+
+    def open_time_form(self):
+        from adminFormTime import AdminFormTime
+        self.close()
+        self.form = AdminFormTime(self.is_superadmin)
+        self.form.show()
+
+    def open_po_form(self):
+        from adminFormPO import AdminFormPO
+        self.close()
+        self.form = AdminFormPO(self.is_superadmin)
+        self.form.show()
+
+    def open_web_form(self):
+        from adminFormWeb import AdminFormWeb
+        self.close()
+        self.form = AdminFormWeb(self.is_superadmin)
+        self.form.show()
+
+    def closeEvent(self, event):
+        self.menuSotr.setEnabled(True)
+        event.accept()

@@ -4,7 +4,7 @@ from PyQt6.QtCore import QDate, Qt, QDateTime
 from openpyxl.workbook import Workbook
 
 from otcheti_design import Ui_otchetForm
-from adminForm import AdminForm
+from adminFormSotr import AdminForm
 
 
 class OtchetForm(QMainWindow, Ui_otchetForm):
@@ -15,19 +15,24 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
         self.is_superadmin = is_superadmin
         self.usersListUReport()
         self.usersListPoReport()
+        self.usersListWebReport()
         self.userReport.toggled.connect(self.toggle_user_report_frame)
         self.dayReport.toggled.connect(self.toggle_day_report_frame)
         self.poReport.toggled.connect(self.toggle_po_report_frame)
+        self.webReport.toggled.connect(self.toggle_web_report_frame)
         self.pushButton.clicked.connect(self.user_generate_report)
         self.dayReportBtn.clicked.connect(self.day_generate_report)
         self.poReportBtn.clicked.connect(self.po_generate_report)
+        self.webReportBtn.clicked.connect(self.web_generate_report)
         self.fistDate.setDate(QDate.currentDate())
         self.reportDate.setDate(QDate.currentDate())
         self.lastDate.setDate(QDate.currentDate())
         self.poDate.setDate(QDate.currentDate())
+        self.webDate.setDate(QDate.currentDate())
         self.userReportFrame.setVisible(False)
         self.dayReportFrame.setVisible(False)
         self.poReportFrame.setVisible(False)
+        self.webReportFrame.setVisible(False)
         self.exportBtn.clicked.connect(self.exportToExcel)
         self.is_admin = is_admin
         if not self.is_admin:
@@ -51,6 +56,12 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
             self.poReportFrame.setVisible(True)
         else:
             self.poReportFrame.setVisible(False)
+
+    def toggle_web_report_frame(self, checked):
+        if checked:
+            self.webReportFrame.setVisible(True)
+        else:
+            self.webReportFrame.setVisible(False)
 
     def usersListUReport(self):
         # Заполняет ComboBox данными о сотрудниках из базы данных
@@ -81,6 +92,20 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
             user_id = query.value(0)
             user_name = f"{query.value(1)} {query.value(2)} {query.value(3)}"
             self.selectPoUser.addItem(user_name, user_id)
+
+    def usersListWebReport(self):
+        query = QSqlQuery()
+        query.exec("""
+            SELECT a.id_accounts, s.F_sotr, s.I_sotr, s.O_sotr
+            FROM dbo.accounts a
+            JOIN dbo.sotr s ON a.sotr_id = s.id_sotr
+        """)
+        self.selectWebUser.clear()
+        self.selectWebUser.addItem("- Выберите пользователя -", None)
+        while query.next():
+            user_id = query.value(0)
+            user_name = f"{query.value(1)} {query.value(2)} {query.value(3)}"
+            self.selectWebUser.addItem(user_name, user_id)
 
     def user_generate_report(self):
         # Формирует отчет о рабочем времени сотрудника за выбранный период
@@ -180,6 +205,37 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
             self.otchetTable.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         else:
             QMessageBox.warning(self, "Ошибка", "Не удалось сформировать отчет.")
+
+    def web_generate_report(self):
+        # Генерирует отчет о посещённых веб-ресурсах для выбранного пользователя
+        selected_user_id = self.selectWebUser.currentData()
+        selected_date = self.webDate.date().toString("dd-MM-yyyy")
+
+        if not selected_user_id:
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите сотрудника.")
+            return
+
+        query = QSqlQuery()
+        query.prepare("""
+            SELECT url_web, data_ychet_web
+            FROM dbo.web
+            WHERE accounts3_id = :user_id AND data_ychet_web = :date
+        """)
+        query.bindValue(":user_id", selected_user_id)
+        query.bindValue(":date", selected_date)
+
+        if query.exec():
+            model = QSqlTableModel()
+            model.setQuery(query)
+
+            model.setHeaderData(0, Qt.Orientation.Horizontal, "Веб-ресурс")
+            model.setHeaderData(1, Qt.Orientation.Horizontal, "Дата посещения")
+
+            self.otchetTable.setModel(model)
+            self.otchetTable.resizeColumnsToContents()
+            self.otchetTable.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        else:
+            QMessageBox.warning(self, "Ошибка", "Не удалось сформировать отчет о веб-ресурсах.")
 
     def showAdminForm(self):
         self.admin_form = AdminForm(self.is_superadmin)
