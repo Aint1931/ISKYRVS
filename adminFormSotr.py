@@ -5,7 +5,6 @@ from PyQt6.QtSql import QSqlQuery, QSqlTableModel, QSqlQueryModel
 from PyQt6.QtWidgets import QMainWindow, QHeaderView, QMessageBox, QDialog, QLineEdit, QVBoxLayout, QPushButton, \
     QCheckBox, QTableView
 
-
 from adminFormSotrDesign import Ui_adminFormSotr
 
 
@@ -91,9 +90,7 @@ class AdminForm(QMainWindow, Ui_adminFormSotr):
             self.upFrameEnabled(False)
             return
 
-
         self.upFrameEnabled(True)
-
 
         query = QSqlQuery()
         query.prepare("""
