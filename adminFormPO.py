@@ -98,6 +98,7 @@ class AdminFormPO(QMainWindow, Ui_adminFormPO):
             user_id = query.value(0)
             user_name = f"{query.value(1)} {query.value(2)} {query.value(3)}"
             self.selectPolz.addItem(user_name, user_id)
+        self.selectPolz.currentIndexChanged.connect(self.setup_table)
 
     def setup_date_filter(self):
         self.selectDate.dateChanged.connect(self.setup_table)
