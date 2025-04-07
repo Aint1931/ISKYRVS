@@ -61,7 +61,7 @@ class AuthApp(QMainWindow, Ui_Authorization):
             QMessageBox.information(self, "Успех", f"Авторизация прошла успешно!")
             self.hide()
 
-            if not self.is_admin and not self.is_supervisor:
+            if not self.is_admin and not self.is_supervisor and not self.is_superadmin:
                 self.open_uchet_form()
             else:
                 self.open_otchet_form()

@@ -5,6 +5,7 @@ from openpyxl.workbook import Workbook
 
 from otcheti_design import Ui_otchetForm
 from adminFormSotr import AdminForm
+from user_form import UchetForm
 
 
 class OtchetForm(QMainWindow, Ui_otchetForm):
@@ -24,6 +25,7 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
         self.dayReportBtn.clicked.connect(self.day_generate_report)
         self.poReportBtn.clicked.connect(self.po_generate_report)
         self.webReportBtn.clicked.connect(self.web_generate_report)
+        self.uchetTimeBtn.clicked.connect(self.open_uchet_form)
         self.fistDate.setDate(QDate.currentDate())
         self.reportDate.setDate(QDate.currentDate())
         self.lastDate.setDate(QDate.currentDate())
@@ -291,3 +293,7 @@ class OtchetForm(QMainWindow, Ui_otchetForm):
             QMessageBox.information(self, "Успех", f"Данные успешно экспортированы в файл:\n{file_path}")
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить файл:\n{str(e)}")
+
+    def open_uchet_form(self):
+        self.uchet_form = UchetForm(self.user_id)
+        self.uchet_form.show()
